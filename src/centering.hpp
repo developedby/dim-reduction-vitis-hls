@@ -3,7 +3,7 @@
 
 #include "types.hpp"
 
-template <dimsize_t ROWS, dimsize_t COLS, dimsize_t BANDS>
-void mean_centering_bip(hls::stream<data_t> &in, hls::stream<data_t> &out);
+void mean_centering_bip(dim_t bands, dim_t pixels, data_t data[MAX_PIXELS][MAX_BANDS]);
+void mean_centering_bsp(dim_t bands, dim_t pixels, data_t data[MAX_BANDS][MAX_PIXELS]);
 
 #endif

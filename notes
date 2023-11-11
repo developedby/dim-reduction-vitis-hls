@@ -1,0 +1,37 @@
+## Bram
+BRAM uses AXI buses to comunicate, which support burst read and writes.
+Synthesizer is very strict on burst inference:
+  Proper widths (powers of 2 and same width for all signals sharing bus)
+  Proper alignment of access (powers of 2)
+  Only simple access patterns (x[i/len] and x[i%len] for example are not allowed)
+  Only sequential reads, strides other than 1 are not allowed
+  No overlapping accesses. Doesn't infer even very simple fixes.
+  No conditional accesses. Doesn't seem to be able to infer when it could actually be done
+  Number of accesses must be even.
+  All accesses sharing the same bus must have the same latency.
+
+Any algorithm that requires the datacube to be in BRAM will not work, since it's not large enough to store the whole image.
+Using streaming is required.
+
+## Compiler
+The compiler does practically no optimization and inference over your code, it is taken as is. The only thing it infers is the hardware part (pipelining, burst accesses, allocation and scheduling, etc).
+Pipelining, dependency and timing issues will generally occur regardless of the size of the data, so it is very useful to work with small data as we're developing and only scale at the end.
+  Compilation with a lot of issues tends to take much longer. This is especially true for large data, as the compiler has too many options to try.
+
+## Pipelining
+We want to minimize the amount of operations done in one loop operation to avoid having large pipelining on the loop body, which slows down execution.
+In general we want a shallow and wide datapath. Vitis infers datapath execution pretty well.
+Nested ifs and compund conditions are always sequential and are best avoided.
+For some reason the ternary operator wields slightly different results compared to the equivalent if-else.
+
+## Loops
+Variable length loops are problematic for a couple reasons.
+  They are not easily parallelizable. This can be partially solved by indicating that the variable length is a multiple of a power of two. This allows up to that power of two of parallelism.
+  They increase the datapath length since we have to check the bounds every iteration, which is sequential with whatever other operation we're doing.
+  We don't know how long each function takes, since it depends on the given dynamic bound.
+One option is to have a fixed max amount and then an `if counter < dynamically known max`, but this worsens the datapath and causes more pipelining.
+Loops should be "perfect". That is, the whole loop body should be in the innermost loop and no logic between loop levels.
+
+
+## BIP and BSP:
+  Mean centering works ok for both. Slightly more efficient for BSP since we don't need to store all the means at the same time, but negligible cost compared to the total (mainly storing the covar matrix).

@@ -3,51 +3,58 @@
 #include <iostream>
 #include "covariance.hpp"
 
-/*
 static void test_mean_centering_bip() {
-	data_t * nums = new data_t[MAX_POINTS];
-	hls::stream<data_t> input_stream;
-	hls::stream<data_t> output_stream;
+	std::cout << "Mean centering BIP\n";
 
-	for (dimsize_t i = 0; i < MAX_POINTS; i++) {
-		nums[i] = data_t(i);
-		input_stream.write(nums[i]);
+	constexpr dimsize_t pixels = 20;
+	constexpr dimsize_t bands = 10;
+	data_t nums[MAX_PIXELS][MAX_BANDS];
+	for (uint i = 0; i < pixels; i++) {
+		for (uint j = 0; j < bands; j++) {
+			nums[i][j] = data_t(i);
+		}
 	}
 
-	mean_centering_bip<MAX_ROWS, MAX_COLS, MAX_BANDS>(input_stream, output_stream);
+	mean_centering_bip(bands, pixels, nums);
 
-	large_data_t sum = 0;
-	for (dimsize_t i = 0; i < MAX_POINTS; i++) {
-		sum += output_stream.read();
+	data_t sums[MAX_BANDS] = {0};
+	for (uint i = 0; i < pixels; i++) {
+		for (uint j = 0; j < bands; j++) {
+			sums[j] += nums[i][j];
+		}
 	}
-
-	std::cout << sum << std::endl;
+	for (uint i = 0; i < bands; i++) {
+		std::cout << "Sum " << i << " : " << sums[i] << std::endl;
+	}
 }
-*/
 
 static void test_mean_centering_bsp() {
+	std::cout << "Mean centering BSP\n";
+
 	constexpr dimsize_t pixels = 20;
-	constexpr dimsize_t bands = 20;
-	data_t nums[bands][pixels];
+	constexpr dimsize_t bands = 10;
+	data_t nums[MAX_BANDS][MAX_PIXELS];
 	for (uint i = 0; i < bands; i++) {
 		for (uint j = 0; j < pixels; j++) {
 			nums[i][j] = data_t(j);
 		}
 	}
 
-	xf::fintech::internal::aveImpl<data_t, bands, pixels, 4, 1, 16>(bands, pixels, nums);
+	mean_centering_bsp(bands, pixels, nums);
 
+	data_t sums[MAX_BANDS] = {0};
 	for (uint i = 0; i < bands; i++) {
-		data_t sum = 0;
 		for (uint j = 0; j < pixels; j++) {
-			sum += nums[i][j];
+			sums[i] += nums[i][j];
 		}
-		std::cout << "Sum " << i << " : " << sum << std::endl;
+	}
+	for (uint i = 0; i < bands; i++) {
+		std::cout << "Sum " << i << " : " << sums[i] << std::endl;
 	}
 }
 
 int main() {
-	// test_mean_centering_bip();
+	test_mean_centering_bip();
 	test_mean_centering_bsp();
 	return 0;
 }

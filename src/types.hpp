@@ -6,17 +6,30 @@
 #include "hls_stream.h"
 
 #include <cstdint>
+#include <type_traits>
 
-typedef uint32_t dimsize_t;
+using hls::stream;
 
-constexpr dimsize_t MAX_COLS = 684;
-constexpr dimsize_t MAX_ROWS = 956;
-constexpr dimsize_t MAX_PIXELS = MAX_ROWS * MAX_COLS;
-constexpr dimsize_t MAX_BANDS = 120;
-constexpr dimsize_t MAX_POINTS = MAX_PIXELS * MAX_BANDS;
+// Minimum length for storing number of pixels, indexing in data cube, etc
+typedef uint32_t dim_t;
 
 
-typedef float data_t;
-typedef float large_data_t;
+/* constexpr dim_t MAX_COLS = 684;
+constexpr dim_t MAX_ROWS = 956;
+constexpr dim_t MAX_BANDS = 120; */
+
+constexpr dim_t MAX_COLS = 16;
+constexpr dim_t MAX_ROWS = 16;
+constexpr dim_t MAX_BANDS = 16;
+
+constexpr dim_t MAX_PIXELS = MAX_ROWS * MAX_COLS;
+constexpr dim_t MAX_POINTS = MAX_PIXELS * MAX_BANDS;
+
+constexpr bool use_float = true;
+
+// The datatype used for most operations
+typedef std::conditional<use_float, float, ap_fixed<32, 24>>::type data_t;
+// The datatype used for operations that may hold a large number.
+typedef std::conditional<use_float, float, ap_fixed<64, 48>>::type large_data_t;
 
 #endif
