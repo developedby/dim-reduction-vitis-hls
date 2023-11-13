@@ -1,3 +1,8 @@
+## Setup
+Vitis is extremely picky about the system it's installed on.
+Some features are only available on Linux, and it requires the exact specific version of system libraries to run.
+This pretty much restricts us to either running it in a container or using just the distributions they mention are supported.
+
 ## Bram
 BRAM uses AXI buses to comunicate, which support burst read and writes.
 Synthesizer is very strict on burst inference:
@@ -10,8 +15,7 @@ Synthesizer is very strict on burst inference:
   Number of accesses must be even.
   All accesses sharing the same bus must have the same latency.
 
-Any algorithm that requires the datacube to be in BRAM will not work, since it's not large enough to store the whole image.
-Using streaming is required.
+Any algorithm that requires the datacube to be in BRAM will not work, since it's not large enough to store the whole image. Using streaming is required.
 
 ## Compiler
 The compiler does practically no optimization and inference over your code, it is taken as is. The only thing it infers is the hardware part (pipelining, burst accesses, allocation and scheduling, etc).
@@ -22,7 +26,7 @@ Pipelining, dependency and timing issues will generally occur regardless of the 
 We want to minimize the amount of operations done in one loop operation to avoid having large pipelining on the loop body, which slows down execution.
 In general we want a shallow and wide datapath. Vitis infers datapath execution pretty well.
 Nested ifs and compund conditions are always sequential and are best avoided.
-For some reason the ternary operator wields slightly different results compared to the equivalent if-else.
+For some reason the ternary operator wields slightly different results compared to the equivalent if-else. Haven't investigated much but could do with the fact that the compiler is not optimizing and so different instruction order could affect the outcome. It could also be that ternary expressions are considered data and ifs are considered control.
 
 ## Loops
 Variable length loops are problematic for a couple reasons.
@@ -30,7 +34,14 @@ Variable length loops are problematic for a couple reasons.
   They increase the datapath length since we have to check the bounds every iteration, which is sequential with whatever other operation we're doing.
   We don't know how long each function takes, since it depends on the given dynamic bound.
 One option is to have a fixed max amount and then an `if counter < dynamically known max`, but this worsens the datapath and causes more pipelining.
-Loops should be "perfect". That is, the whole loop body should be in the innermost loop and no logic between loop levels.
+Loops should be "perfect". That is, the whole loop body should be in the innermost loop and no logic between loop levels. This is required for loop merging, that is taking two loops that happen sequentailly in code and transforming them into a single one (sharing the same counter) and for loop flattening, taking nested loops and transforming them into a single big loop.
+When a loop body is not able to be done within a single cycle (conditionals, carried dependencies, etc), we can enable pipeline of two and manually unroll 2 operations. This can be expanded in case we need more slack. Works especially we for operations that can be done in a tree-like fashion.
+
+## Array partitioning
+For operations that are purely streaming is not very useful, but once we hit BRAM we can divide some of our data to be processed in paralel.
+This can be done by separating the array in multiple parts, using the right pragma. Then we do an unrolled loop over the different partitions which become parallel hardware if they don't depend on each other.
+For things that do share some of the same resources (like the temporary buffer when calculating the covariance), if we only need to read we can use multiport BRAM to do 2 reads in one clock cycle, which allows partitioning of 2 (not yet tested).
+What should be possible to do (also not yet tested) is to partition the covariance matrix so each pixel can operate in parallel, using some kind of offsetted access pattern so that each parallel pixel being processed accesses a different partition at all cycles. Unfortunately it doesn't seem that Vitis is capable of doing this kind of complex polyhedral analysis and it must be implemented manually.
 
 ## Performance
 Synthesis can't calculate the latency for loop of variable length. Must synthesize a wrapper IP that provides the loop boundaries as constants.
