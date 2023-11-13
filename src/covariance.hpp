@@ -3,6 +3,6 @@
 
 #include "types.hpp"
 
-void covariance_bsp(int pixels, int bands, hls::stream<data_t> &data, data_t covar[MAX_BANDS][MAX_BANDS]);
+void covariance_bsq(uint32_t pixels, uint16_t bands, stream<data_t> &data1, stream<data_t> &data2, stream<data_t> &covar);
 
 #endif

@@ -32,6 +32,11 @@ Variable length loops are problematic for a couple reasons.
 One option is to have a fixed max amount and then an `if counter < dynamically known max`, but this worsens the datapath and causes more pipelining.
 Loops should be "perfect". That is, the whole loop body should be in the innermost loop and no logic between loop levels.
 
+## Performance
+Synthesis can't calculate the latency for loop of variable length. Must synthesize a wrapper IP that provides the loop boundaries as constants.
+Synthesis doesn't account for FIFO full/empty in its latency calculation, we have to use cosimulation for that (running a test as both a C program and an hdl simulation).
 
-## BIP and BSP:
-  Mean centering works ok for both. Slightly more efficient for BSP since we don't need to store all the means at the same time, but negligible cost compared to the total (mainly storing the covar matrix).
+## BIP and BSQ:
+Mean centering works ok for both. Slightly more efficient for BSQ since we don't need to store all the means at the same time, but negligible cost compared to the total (mainly calculating and storing the covar matrix).
+For calculating the covariance matrix, we'd like to have both, since they are transpose of each other.
+Otherwise, BIP is much better, since we only need to store one pixel at a time instead of one band at a time (~1000x smaller).
