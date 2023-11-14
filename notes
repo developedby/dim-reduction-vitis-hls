@@ -14,18 +14,18 @@ Synthesizer is very strict on burst inference:
   No conditional accesses. Doesn't seem to be able to infer when it could actually be done
   Number of accesses must be even.
   All accesses sharing the same bus must have the same latency.
-
 Any algorithm that requires the datacube to be in BRAM will not work, since it's not large enough to store the whole image. Using streaming is required.
 
 ## Compiler
 The compiler does practically no optimization and inference over your code, it is taken as is. The only thing it infers is the hardware part (pipelining, burst accesses, allocation and scheduling, etc).
 Pipelining, dependency and timing issues will generally occur regardless of the size of the data, so it is very useful to work with small data as we're developing and only scale at the end.
-  Compilation with a lot of issues tends to take much longer. This is especially true for large data, as the compiler has too many options to try.
+One of the few exceptions are loop-carried dependencies, where the slack may get tighter and tighter with growing number of iterations, but this is detectable when we see II violations during compilation, at which point we can cancel the compilation, fix them with smaller data and try again.
+Compilation with a lot of issues tends to take much longer. This is especially true for large data, as the compiler has too many options to try.
 
 ## Pipelining
 We want to minimize the amount of operations done in one loop operation to avoid having large pipelining on the loop body, which slows down execution.
 In general we want a shallow and wide datapath. Vitis infers datapath execution pretty well.
-Nested ifs and compund conditions are always sequential and are best avoided.
+Nested ifs are sequential and are best avoided. Compound conditions are better, but still increase the sequential path, especially control-side.
 For some reason the ternary operator wields slightly different results compared to the equivalent if-else. Haven't investigated much but could do with the fact that the compiler is not optimizing and so different instruction order could affect the outcome. It could also be that ternary expressions are considered data and ifs are considered control.
 
 ## Loops
@@ -39,15 +39,21 @@ When a loop body is not able to be done within a single cycle (conditionals, car
 
 ## Array partitioning
 For operations that are purely streaming is not very useful, but once we hit BRAM we can divide some of our data to be processed in paralel.
-This can be done by separating the array in multiple parts, using the right pragma. Then we do an unrolled loop over the different partitions which become parallel hardware if they don't depend on each other.
+This can be done by separating the array in multiple parts, using the right pragma. Then we do a parallel loop over the different partitions which become parallel hardware if they don't depend on each other.
 For things that do share some of the same resources (like the temporary buffer when calculating the covariance), if we only need to read we can use multiport BRAM to do 2 reads in one clock cycle, which allows partitioning of 2 (not yet tested).
 What should be possible to do (also not yet tested) is to partition the covariance matrix so each pixel can operate in parallel, using some kind of offsetted access pattern so that each parallel pixel being processed accesses a different partition at all cycles. Unfortunately it doesn't seem that Vitis is capable of doing this kind of complex polyhedral analysis and it must be implemented manually.
+For operations that can't be parallelized because they would read the same array but in different order, we can duplicate the array to allow more parallelism with a bit of memory overhead.
+To be able to partition an array, we need it to have dimension that is a multiple of the partitioning factor. Depending on how we deal with the partitioning that could mean restricting the alignment of our data to be non-sequential and restricting the dynamic dimension to also be a multiple of the partitioning factor. This makes array partitioning hard to deal with, even though if the compiler were better it could do it by itself.
+We can hint to the compiler that a value is multiple of another using assertions like `assert(n_dims % n_parts == 0)`.
 
 ## Performance
 Synthesis can't calculate the latency for loop of variable length. Must synthesize a wrapper IP that provides the loop boundaries as constants.
 Synthesis doesn't account for FIFO full/empty in its latency calculation, we have to use cosimulation for that (running a test as both a C program and an hdl simulation).
+Computation and memory complexity of PCA is limited by the complexity of calculating the covariance. We need to do a matrix multiplication that involves multiplying each value in each pixel by all values in the same pixel, meaning complexity of (num_pixels * num_bands^2). If we somehow managed to use the covariance and eigenvectors in a streaming way, the memory complexity could be O(num_bands), but more likely it is O(num_band^2) for BIP ordered data and O(num_bands^2 + num_pixels) for BSQ ordered data.
+Also, because we don't do dynamic BRAM allocation, if the algorithm should handle all possible choices of number of components then the memory usage is chosen during synthesis with the worst possible value.
+The compiler doesn't seem to detect when blocks of memory are used only in specific times to reuse that memory in later steps, but it could be some options or hint to the compiler that I haven't yet found.
 
 ## BIP and BSQ:
 Mean centering works ok for both. Slightly more efficient for BSQ since we don't need to store all the means at the same time, but negligible cost compared to the total (mainly calculating and storing the covar matrix).
-For calculating the covariance matrix, we'd like to have both, since they are transpose of each other.
+For calculating the covariance matrix, we'd like to have both, since they are transpose of each other. That would allow us to parallelize up to the number of bands without needing intermediate storage.
 Otherwise, BIP is much better, since we only need to store one pixel at a time instead of one band at a time (~1000x smaller).
