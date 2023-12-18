@@ -1,0 +1,25 @@
+100MHz clock
+684x956x120 image
+
+Mean centering
+
+Baseline
+  Latency: 116.9 s
+  BRAM: 32 (6%)
+  DSP: 2 (1%)
+  FF: 3744 (2%)
+  LUT: 6415 (8%)
+
+bip m_axi
+  Latency: 3.9 s
+  BRAM: 60 (11%)
+  DSP: 2 (1%)
+  FF: 5845 (3%)
+  LUT: 78600 (7%)
+
+bsq axis
+  Latency: 2.354 s
+  BRAM: 0 (0%)
+  DSP: 2 (1%)
+  FF: 605 (0%)
+  LUT: 1146 (1%)

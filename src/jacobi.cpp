@@ -1,40 +1,31 @@
-
+// Adapted from "Efficient Hardware for Principal Component Analysis of Hyperspectral Images", Olivier Lesage, 2023
 #include "jacobi.hpp"
 #include "hls_math.h"
 
 constexpr uint8_t MAX_ITERATIONS = 10;
 
-static void sort_eigen(int n, data_t vectors[MAX_BANDS*MAX_BANDS], data_t values[MAX_BANDS])
-{
+static void sort_eigen(int n, data_t vectors[MAX_BANDS*MAX_BANDS], data_t values[MAX_BANDS]) {
 	/* todo use vitis library sort for more efficient hardware */
 
-	LOOP_SORT_EIGEN: for ( int k = 0; k < MAX_BANDS - 1; k++ )
-	{
-		if ( k < n - 1 )
-		{
+	LOOP_SORT_EIGEN: for ( int k = 0; k < MAX_BANDS - 1; k++ ) {
+		if (k < n - 1) {
 			int m = k;
 
-			for ( int l = 0; l < MAX_BANDS; l++ )
-			{
-				if ( (l >= k + 1) && (l < n) )
-				{
-					if ( values[l] > values[m] )
-					{
+			for (int l = 0; l < MAX_BANDS; l++) {
+				if ( (l >= k + 1) && (l < n) ) {
+					if (values[l] > values[m]) {
 						m = l;
 					}
 				}
 			}
 
-			if ( m != k )
-			{
+			if (m != k) {
 				data_t t = values[m];
 				values[m] = values[k];
 				values[k] = t;
 
-				for ( int i = 0; i < MAX_BANDS; i++ )
-				{
-					if ( i < n )
-					{
+				for (int i = 0; i < MAX_BANDS; i++) {
+					if (i < n) {
 						data_t w = vectors[i+m*n];
 						vectors[i+m*n] = vectors[i+k*n];
 						vectors[i+k*n] = w;
@@ -82,8 +73,7 @@ static void id_matrix  ( int n, data_t a[MAX_BANDS*MAX_BANDS] )
   }
 }
 
-void jacobi_eigenvalue ( int n, data_t a[MAX_BANDS*MAX_BANDS], data_t v[MAX_BANDS*MAX_BANDS], data_t d[MAX_BANDS])
-{
+void jacobi_eigenvalue ( int n, data_t a[MAX_BANDS*MAX_BANDS], data_t v[MAX_BANDS*MAX_BANDS], data_t d[MAX_BANDS]) {
 	data_t c;
 	data_t g;
 	data_t gapq;
@@ -108,24 +98,18 @@ void jacobi_eigenvalue ( int n, data_t a[MAX_BANDS*MAX_BANDS], data_t v[MAX_BAND
 	data_t bw[MAX_BANDS];
 	data_t zw[MAX_BANDS] = {};
 
-	LOOP_JACOBI_PRE: for (int i = 0; i < MAX_BANDS; i++ )
-	{
-		if (i < n)
-		{
+	LOOP_JACOBI_PRE: for (int i = 0; i < MAX_BANDS; i++ ) {
+		if (i < n) {
 			bw[i] = d[i];
 		}
 	}
 
-	LOOP_JACOBI: for (int iter = 0; iter < MAX_ITERATIONS; iter++)
-	{
+	LOOP_JACOBI: for (int iter = 0; iter < MAX_ITERATIONS; iter++) {
 		data_t convergence_threshold = zero;
 
-		LOOP_CONVERGENCE_THRESHOLD: for ( int j = 0; j < MAX_BANDS; j++ )
-		{
-			for ( int i = 0; i < MAX_BANDS; i++ )
-			{
-				if (j < n && i < j)
-				{
+		LOOP_CONVERGENCE_THRESHOLD: for ( int j = 0; j < MAX_BANDS; j++ ) {
+			for ( int i = 0; i < MAX_BANDS; i++ ) {
+				if (j < n && i < j) {
 					convergence_threshold += a[i + j * n] * a[i + j * n];
 				}
 			}
@@ -133,44 +117,30 @@ void jacobi_eigenvalue ( int n, data_t a[MAX_BANDS*MAX_BANDS], data_t v[MAX_BAND
 
 		convergence_threshold = hls::sqrt ( convergence_threshold ) / ( four * n );
 
-		if ( convergence_threshold == zero )
-		{
+		if ( convergence_threshold == zero ) {
 			break;
 		}
 
-		LOOP_JACOBI_MAIN_p: for ( int p = 0; p < MAX_BANDS; p++ )
-		{
-			if (p < n)
-			{
-				LOOP_JACOBI_MAIN_q: for ( int q = 0; q < MAX_BANDS; q++ )
-				{
-					if ((q >= p + 1) && (q < n))
-					{
+		LOOP_JACOBI_MAIN_p: for ( int p = 0; p < MAX_BANDS; p++ ) {
+			if (p < n) {
+				LOOP_JACOBI_MAIN_q: for ( int q = 0; q < MAX_BANDS; q++ ) {
+					if ((q >= p + 1) && (q < n)) {
 						gapq = ten * hls::fabs ( a[p+q*n] );
 						termp = gapq + hls::fabs ( d[p] );
 						termq = gapq + hls::fabs ( d[q] );
 
-						if (4 < iter &&
-								termp == hls::fabs ( d[p] ) &&
-								termq == hls::fabs ( d[q] ) )
-						{
+						if (4 < iter && termp == hls::fabs(d[p]) && termq == hls::fabs(d[q])) {
 							a[p+q*n] = zero;
-						}
-						else
-						{
+						} else {
 							h = d[q] - d[p];
 							term = hls::fabs ( h ) + gapq;
 
-							if ( term == hls::fabs ( h ) )
-							{
+							if (term == hls::fabs(h)) {
 								t = a[p+q*n] / h;
-							}
-							else
-							{
+							} else {
 								data_t theta = point_five * h / a[p+q*n];
 								t = one / ( hls::fabs ( theta ) + hls::sqrt ( one + theta * theta ) );
-								if ( theta < zero )
-								{
+								if (theta < zero) {
 									t = -t;
 								}
 							}
@@ -186,21 +156,19 @@ void jacobi_eigenvalue ( int n, data_t a[MAX_BANDS*MAX_BANDS], data_t v[MAX_BAND
 
 							a[p+q*n] = 0;
 
-							LOOP_ROT_1: for ( int j = 0; j < MAX_BANDS; j++ )
-							{
-								if (j < p)
-								{
+							LOOP_ROT_1:
+							for (int j = 0; j < MAX_BANDS; j++) {
+								if (j < p) {
 									g = a[j+p*n];
 									h = a[j+q*n];
-									a[j+p*n] = g - s * ( h + g * tau );
-									a[j+q*n] = h + s * ( g - h * tau );
+									a[j+p*n] = g - s * (h + g * tau);
+									a[j+q*n] = h + s * (g - h * tau);
 								}
 							}
 
-							LOOP_ROT_2: for ( int j = 0; j < MAX_BANDS; j++ )
-							{
-								if ((j >= p + 1) && (j < q))
-								{
+							LOOP_ROT_2:
+							for (int j = 0; j < MAX_BANDS; j++) {
+								if ((j >= p + 1) && (j < q)) {
 									g = a[p+j*n];
 									h = a[j+q*n];
 									a[p+j*n] = g - s * ( h + g * tau );
@@ -208,10 +176,9 @@ void jacobi_eigenvalue ( int n, data_t a[MAX_BANDS*MAX_BANDS], data_t v[MAX_BAND
 								}
 							}
 
-							LOOP_ROT_3: for (int j = 0; j < MAX_BANDS; j++ )
-							{
-								if ((j >= q + 1) && (j < n))
-								{
+							LOOP_ROT_3:
+							for (int j = 0; j < MAX_BANDS; j++) {
+								if ((j >= q + 1) && (j < n)) {
 									g = a[p+j*n];
 									h = a[q+j*n];
 									a[p+j*n] = g - s * ( h + g * tau );
@@ -219,10 +186,9 @@ void jacobi_eigenvalue ( int n, data_t a[MAX_BANDS*MAX_BANDS], data_t v[MAX_BAND
 								}
 							}
 
-							LOOP_UPDATE_VECTORS: for (int j = 0; j < MAX_BANDS; j++ )
-							{
-								if (j < n)
-								{
+							LOOP_UPDATE_VECTORS:
+							for (int j = 0; j < MAX_BANDS; j++ ) {
+								if (j < n) {
 									g = v[j+p*n];
 									h = v[j+q*n];
 									v[j+p*n] = g - s * ( h + g * tau );
@@ -235,11 +201,10 @@ void jacobi_eigenvalue ( int n, data_t a[MAX_BANDS*MAX_BANDS], data_t v[MAX_BAND
 			}
 		}
 
-		LOOP_POST_OP: for (int i = 0; i < MAX_BANDS; i++ )
-		{
-#pragma HLS PIPELINE
-			if (i < n)
-			{
+		LOOP_POST_OP:
+		for (int i = 0; i < MAX_BANDS; i++ ) {
+			#pragma HLS PIPELINE
+			if (i < n) {
 				bw[i] += zw[i];
 				d[i] = bw[i];
 				zw[i] = zero;
@@ -248,52 +213,4 @@ void jacobi_eigenvalue ( int n, data_t a[MAX_BANDS*MAX_BANDS], data_t v[MAX_BAND
 	}
 
 	sort_eigen(n, v, d);
-}
-
-void jacobi_eigenvalue( int n,
-		stream<data_t> &matrix,
-		stream<data_t> &eigenvectors,
-		stream<data_t> &eigenvalues)
-{
-#pragma HLS INTERFACE mode=axis port=matrix,eigenvectors,eigenvalues
-
-	data_t j_mat_buf[MAX_BANDS*MAX_BANDS];
-	data_t j_vec_buf[MAX_BANDS*MAX_BANDS];
-	data_t j_val_buf[MAX_BANDS];
-
-	LOOP_JACOBI_STREAM_IN_MAT: for (int i = 0; i < MAX_BANDS*MAX_BANDS; i++)
-	{
-		if (i < n*n)
-		{
-			j_mat_buf[i] = matrix.read();
-		}
-	}
-
-	jacobi_eigenvalue(n, j_mat_buf, j_vec_buf, j_val_buf);
-
-	LOOP_JACOBI_STREAM_OUT_VEC: for (int i = 0; i < MAX_BANDS*MAX_BANDS; i++)
-	{
-		if (i < n*n)
-		{
-			eigenvectors << j_vec_buf[i];
-		}
-	}
-
-	LOOP_JACOBI_STREAM_OUT_VAL: for (int i = 0; i < MAX_BANDS; i++)
-	{
-		if (i < n)
-		{
-			eigenvalues << j_val_buf[i];
-		}
-	}
-}
-
-void jacobi_eigenvalue_ip( int n,
-		stream<data_t> &matrix,
-		stream<data_t> &eigenvectors,
-		stream<data_t> &eigenvalues)
-{
-#pragma HLS INTERFACE mode=axis port=matrix,eigenvectors,eigenvalues
-#pragma HLS INTERFACE mode=s_axilite port=n
-	jacobi_eigenvalue(n, matrix, eigenvectors, eigenvalues);
 }

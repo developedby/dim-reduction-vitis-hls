@@ -1,0 +1,250 @@
+100MHz
+Small: 8x8x64
+Big: 684x956x120
+
+Adding many numbers sequentially loses precision. (Sum is num_pixels greater than each value)
+We want to add numbers of same order of magnitude, using an add tree.
+If dividing at the end, can instead add group of numbers, divide and add each group. (Best for precision is every sqrt(num_pixels) values?)
+For some reason dividing each value and adding them has lower error than adding and then dividing.
+Percentage error for mean centering = abs(actual mean after centering - expected mean (0) / mean of original data):
+  Adding all values and dividing at the end: 0.308357%
+  Dividing each value and then adding them: 0.066893%
+  Adding values in large groups (128), dividing the groups and adding them: 0.000228491%
+  Dividing each value, adding small groups with an add tree and adding the tree results (lib): 0.000175321%
+Dividing each value (obviously) increases the total number of operations.
+
+Using multiplication has in general (~3x) less latency than division.
+
+15s for 1ms of rtl simulation. Simulation of the full image would take over 50 hours (for just mean centering, the fastest step).
+
+
+
+center:
+  lib:
+    small:
+      syn:
+        lat: 24.204ms
+        bram: 4 0%
+        dsp: 9 2%
+        ff: 6316 4%
+        lut: 9498 12%
+      cosim:
+        lat: 6.646ms
+      impl:
+        bram: 2 0.38%
+        dsp: 9 2.25%
+        ff: 12769 8.12%
+        lut: 8330 10.60%
+        clk: 6.457ns
+    big:
+      syn:
+        lat: 58.851s
+        bram: 58 10%
+        dsp: 14 3%
+        ff: 22997 14%
+        lut: 21843 27%
+      impl:
+        bram: 31 5.85%
+        dsp: 14 3.50%
+        ff: 11951 7.60%
+        lut: 7782 9.90%
+        clk: 6.457ns
+  baseline bip:
+    small:
+      syn:
+        lat: 6.024ms
+        bram: 6 1%
+        dsp: 8 2%
+        ff: 2902 1%
+        lut: 4033 5%
+      cosim:
+        lat: 6.638ms
+      impl:
+        bram: 3 0.57%
+        dsp: 8 1.28%
+        ff: 4265 2.71%
+        lut: 3530 2.37%
+    big:
+      syn:
+        lat: 116.918s
+        bram: 31 5%
+        dsp: 2 0%
+        ff: 3744 2%
+        lut: 6417 8%
+      impl:
+        bram: 17 5.85%
+        dsp: 2 3.50%
+        ff: 5182 7.60%
+        lut: 4155 9.90%
+  baseline bsq:
+    small:
+      syn:
+        lat: 6.269ms
+        bram: 58 10%
+        dsp: 5 1%
+        ff: 89389 56%
+        lut: 293266 373%
+      cosim: no (too long)
+      impl: fail
+    big:
+      syn:
+        lat: 120.057s
+        bram: 58 10%
+        dsp: 5 1%
+        ff: 5630 3%
+        lut: 9234 11%
+      impl:
+        bram: 31 5.85%
+        dsp: 5 1.25%
+        ff: 6982 4.44%
+        lut: 4116 5.24%
+  bip (stream):
+    small:
+      syn:
+        lat: 127us
+        bram: 6 1%
+        dsp: 10 2%
+        ff: 3853 2%
+        lut: 5211 6%
+      cosim:
+        lat: loop
+      impl:
+        bram: 4 0.57%
+        dsp: 10 1.28%
+        ff: 5016 2.71%
+        lut: 4396 2.37%
+        clk: 6.457ns
+    big:
+      syn:
+        lat: 2.354s
+        bram: 60 11%
+        dsp: 4 1%
+        ff: 6181 3%
+        lut: 9521 12%
+      impl:
+        bram: 33 3.62%
+        dsp: 4 1.00%
+        ff: 7580 4.82%
+        lut: 5375 6.84%
+        clk: 6.457ns
+  bip (buf, unroll=8):
+    small:
+      syn:
+        lat: 1.014ms
+        bram: 9 1%
+        dsp: 2 0%
+        ff: 3024 1%
+        lut: 4269 5%
+      cosim:
+        lat: 657.02us
+      impl:
+        bram: 7 1.32%
+        dsp: 2 0.50%
+        ff: 4282 2.72%
+        lut: 3589 4.57%
+    big:
+      syn:
+        lat: 3.917s
+        bram: 36 6%
+        dsp: 11 2%
+        ff: 6103 3%
+        lut: 7751 9%
+      impl:
+        bram: 36 6.79%
+        dsp: 11 2.75%
+        ff: 5947 3.78%
+        lut: 4314 5.49%
+  bip (buf, unroll=4):
+    big:
+      syn:
+        lat: 5.486s
+        bram: 40 7%
+        dsp: 7 1%
+        ff: 4665 2%
+        lut: 6123 7%
+  bip (buf, unroll=2):
+    big:
+      syn:
+        lat: 8.233s
+        bram: 36 6%
+        dsp: 10 2%
+        ff: 4431 2%
+        lut: 6050 7%
+  bip (buf, unroll=1):
+    big:
+      syn:
+        lat: 14.111s
+        bram: 34 6%
+        dsp: 5 1%
+        ff: 3840 2%
+        lut: 4835 7%
+  bsq (buf, unroll=8):
+    small:
+      syn:
+        lat: 391.05us
+        bram: 6 1%
+        dsp: 7 0%
+        ff: 4103 1%
+        lut: 6490 5%
+      cosim:
+        lat: 407.18us
+      impl:
+        bram: 4 0.75%
+        dsp: 7 1.75%
+        ff: 5706 3.63%
+        lut: 4517 5.75%
+    big:
+      syn:
+        lat: 5.536s
+        bram: 14 2%
+        dsp: 7 1%
+        ff: 3618 2%
+        lut: 6192 7%
+      impl:
+        bram: 12 2.26%
+        dsp: 7 1.75%
+        ff: 4017 2.56%
+        lut: 3185 4.05%
+  bsq (buf, unroll=4):
+    big:
+      syn:
+        lat: 4.715s
+        bram: 66 12%
+        dsp: 11 2%
+        ff: 6622 4%
+        lut: 7566 9%
+  bsq (buf, unroll=2):
+    big:
+      syn:
+        lat: 7.811s
+        bram: 62 11%
+        dsp: 7 1%
+        ff: 6016 3%
+        lut: 6559 8%
+  bsq (buf, unroll=1):
+    big:
+      syn:
+        lat: 14.052s
+        bram: 60 11%
+        dsp: 5 1%
+        ff: 5735 3%
+        lut: 5795 7%
+
+covar:
+  lib:
+    small:
+      syn:
+        lat: 24.204ms
+        bram: 4 0%
+        dsp: 9 2%
+        ff: 6316 4%
+        lut: 9498 12%
+      cosim:
+        lat: 6.646ms
+    big:
+      syn:
+        lat: 58.851s
+        bram: 58 10%
+        dsp: 14 3%
+        ff: 22997 14%
+        lut: 21843 27%

@@ -19,7 +19,7 @@ Any algorithm that requires the datacube to be in BRAM will not work, since it's
 ## Compiler
 The compiler does practically no optimization and inference over your code, it is taken as is. The only thing it infers is the hardware part (pipelining, burst accesses, allocation and scheduling, etc).
 Pipelining, dependency and timing issues will generally occur regardless of the size of the data, so it is very useful to work with small data as we're developing and only scale at the end.
-One of the few exceptions are loop-carried dependencies, where the slack may get tighter and tighter with growing number of iterations, but this is detectable when we see II violations during compilation, at which point we can cancel the compilation, fix them with smaller data and try again.
+One of the few exceptions  are loop-carried dependencies, where the slack may get tighter and tighter with growing number of iterations, but this is detectable when we see II violations during compilation, at which point we can cancel the compilation, fix them with smaller data and try again.
 Compilation with a lot of issues tends to take much longer. This is especially true for large data, as the compiler has too many options to try.
 
 ## Pipelining
@@ -36,6 +36,7 @@ Variable length loops are problematic for a couple reasons.
 One option is to have a fixed max amount and then an `if counter < dynamically known max`, but this worsens the datapath and causes more pipelining.
 Loops should be "perfect". That is, the whole loop body should be in the innermost loop and no logic between loop levels. This is required for loop merging, that is taking two loops that happen sequentailly in code and transforming them into a single one (sharing the same counter) and for loop flattening, taking nested loops and transforming them into a single big loop.
 When a loop body is not able to be done within a single cycle (conditionals, carried dependencies, etc), we can enable pipeline of two and manually unroll 2 operations. This can be expanded in case we need more slack. Works especially we for operations that can be done in a tree-like fashion.
+Large loop unrollings make the compilation very slow, especially if resource allocation and scheduling become too complicated.
 
 ## Array partitioning
 For operations that are purely streaming is not very useful, but once we hit BRAM we can divide some of our data to be processed in paralel.

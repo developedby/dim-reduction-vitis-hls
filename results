@@ -2,6 +2,14 @@
 8x8x64 image
 
 Mean centering
+  bip:
+    latency = 8_337 (83us)
+    latency cosim = 12475
+    bram = 2
+    dsp = 0
+    ff = 186
+    lut = 708
+
   bip to bsq (64 parallel bands):
     latency = 4_354 (43us)
     bram = 0
@@ -17,13 +25,6 @@ Mean centering
     ff = 115
     lut = 368
 
-  bip:
-    latency = 8_337 (83us)
-    latency cosim = 12475
-    bram = 2
-    dsp = 0
-    ff = 186
-    lut = 708
 
 Covariance
   bsq (with add tree size 4)
